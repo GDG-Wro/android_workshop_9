@@ -1,15 +1,14 @@
 package com.example.androidworkshop9.ui.devices
 
 import android.bluetooth.BluetoothAdapter
-import android.bluetooth.BluetoothAdapter.ACTION_DISCOVERY_FINISHED
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothDevice.ACTION_BOND_STATE_CHANGED
-import android.bluetooth.BluetoothDevice.BOND_NONE
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
+import android.bluetooth.le.ScanCallback
+import android.bluetooth.le.ScanFilter
+import android.bluetooth.le.ScanResult
+import android.bluetooth.le.ScanSettings
+import android.bluetooth.le.ScanSettings.SCAN_MODE_LOW_LATENCY
 import android.os.Bundle
+import android.os.ParcelUuid
 import android.util.Log
 import android.view.View
 import androidx.fragment.app.Fragment
@@ -18,7 +17,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.androidworkshop9.R
 import com.example.androidworkshop9.bluetoothStateChanges
 import com.example.androidworkshop9.model.Device
-import com.example.androidworkshop9.ui.ChatFragment
+import com.example.androidworkshop9.ui.LogFragment
+import com.movisens.smartgattlib.Services
 import kotlinx.android.synthetic.main.devices_fragment.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
@@ -62,30 +62,28 @@ class DevicesFragment : Fragment(R.layout.devices_fragment) {
     }
 
     private suspend fun scan() = callbackFlow<BluetoothDevice> {
-        val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-
-        val receiver = object : BroadcastReceiver() {
-            override fun onReceive(context: Context, intent: Intent) {
-                if (intent.action == BluetoothDevice.ACTION_FOUND || intent.action == ACTION_BOND_STATE_CHANGED) {
-                    val device =
-                        intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)!!
-                    offer(device)
-                } else if (intent.action == ACTION_DISCOVERY_FINISHED) {
-                    scan.isEnabled = bluetoothAdapter.isEnabled
+        val scanner = BluetoothAdapter.getDefaultAdapter().bluetoothLeScanner
+        val callback = object : ScanCallback() {
+            override fun onScanResult(callbackType: Int, result: ScanResult) {
+                if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O || result.isConnectable) {
+                    offer(result.device)
                 }
             }
         }
-        requireContext().registerReceiver(receiver, IntentFilter().apply {
-            addAction(BluetoothDevice.ACTION_FOUND)
-            addAction(ACTION_BOND_STATE_CHANGED)
-            addAction(ACTION_DISCOVERY_FINISHED)
-        })
-        bluetoothAdapter.startDiscovery()
+
+        scanner.startScan(
+            listOf(
+                ScanFilter.Builder()
+                    .setServiceUuid(ParcelUuid(Services.HEART_RATE.uuid))
+                    .build()
+            ),
+            ScanSettings.Builder().setScanMode(SCAN_MODE_LOW_LATENCY).build(),
+            callback
+        )
         scan.isEnabled = false
         Log.e("Scan", "Start scanning")
         awaitClose {
-            bluetoothAdapter.cancelDiscovery()
-            requireContext().unregisterReceiver(receiver)
+            scanner.stopScan(callback)
             Log.e("Scan", "Stop scanning")
         }
     }.map { Device(it.name, it.address, it.bondState, it) }
@@ -109,14 +107,10 @@ class DevicesFragment : Fragment(R.layout.devices_fragment) {
     }
 
     private fun onDeviceClicked(device: Device) {
-        if (device.bluetoothDevice.bondState == BOND_NONE) {
-            device.bluetoothDevice.createBond()
-        } else {
-            requireActivity().supportFragmentManager.beginTransaction()
-                .addToBackStack(null)
-                .replace(R.id.container, ChatFragment.newInstance(device.bluetoothDevice))
-                .commit()
-        }
+        requireActivity().supportFragmentManager.beginTransaction()
+            .addToBackStack(null)
+            .replace(R.id.container, LogFragment.newInstance(device.bluetoothDevice))
+            .commit()
     }
 
     companion object {

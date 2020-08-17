@@ -18,14 +18,4 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"/>
-
-    <EditText
-        android:id="@+id/input"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:enabled="false"
-        android:imeOptions="actionSend"
-        android:importantForAutofill="no"
-        android:inputType="text"
-        android:maxLength="255" />
 </LinearLayout>
