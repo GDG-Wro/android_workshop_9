@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Android Workshop9</string>
+    <string name="bluetooth">Bluetooth</string>
+    <string name="missing_permissions">Missing permissions</string>
+</resources>
